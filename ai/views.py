@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from .models import ConnectionRequest, RecommendationLog, ConnectionFeedback
 from .serializers import (
     ConnectionRequestSerializer, 
@@ -98,3 +98,11 @@ class ConnectionFeedbackView(APIView):
         feedbacks = ConnectionFeedback.objects.all()
         serializer = ConnectionFeedbackSerializer(feedbacks, many=True)
         return Response(serializer.data)
+
+def test_interface(request):
+    """테스트 인터페이스 페이지"""
+    return render(request, 'test_interface.html')
+
+def home(request):
+    """메인 서비스 페이지"""
+    return render(request, 'index.html')

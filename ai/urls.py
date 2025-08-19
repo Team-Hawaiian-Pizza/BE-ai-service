@@ -9,4 +9,5 @@ urlpatterns = [
     path('recommend/', views.RecommendConnectionView.as_view(), name='recommend_connection'),
     path('feedback/', views.ConnectionFeedbackView.as_view(), name='connection_feedback'),
     path('requests/', views.ConnectionRequestView.as_view(), name='connection_requests'),
+    path('test/', views.test_interface, name='test_interface'),
 ]

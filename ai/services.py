@@ -1,5 +1,6 @@
 import random
 import os
+import requests
 from typing import List, Dict, Any
 from django.db.models import Q
 from .models import Relationships, ConnectionRequest, RecommendationLog
@@ -58,7 +59,7 @@ class AIRecommendationService:
         """요청 텍스트에서 카테고리 추론"""
         return self._call_gemini_api(request_text)
     
-    def calculate_ai_score(self, requester_id: int, candidate_id: int, introducer_id: int, 
+    def calculate_ai_score(self, requester_id: int, candidate_profile: Dict[str, Any], introducer_id: int, 
                           relationship_degree: int, category: str) -> float:
         """AI 점수 계산 (실제로는 ML 모델을 사용해야 함)"""
         base_score = 0.5
@@ -82,53 +83,99 @@ class AIRecommendationService:
         final_score = min(1.0, base_score + degree_score + (category_weight * 0.3) + random_factor)
         return round(final_score, 3)
     
+    def _fetch_user_profiles_from_core_service(self, user_ids: List[int]) -> List[Dict[str, Any]]:
+        """
+        Core 서비스의 /all API를 호출하여 모든 사용자 정보를 가져온 뒤,
+        필요한 사용자들의 정보만 필터링하여 반환합니다.
+        """
+        core_service_url = "http://core-service-address/all" # <-- API 주소를 /all로 변경
+        
+        try:
+            # params 없이 API를 호출하여 모든 사용자 정보를 가져옵니다.
+            response = requests.get(core_service_url, timeout=10) 
+            response.raise_for_status() 
+            all_users = response.json()
+            
+            # 파이썬 코드로 필요한 user_id를 가진 사용자 정보만 필터링합니다.
+            user_ids_set = set(user_ids)
+            filtered_users = [
+                user for user in all_users 
+                if user.get('id') in user_ids_set
+            ]
+            return filtered_users
+
+        except requests.exceptions.RequestException as e:
+            print(f"Core 서비스 호출 중 오류 발생: {e}")
+            return []
+    
     def find_potential_connections(self, requester_id: int, category: str, 
-                                 max_recommendations: int = 5) -> List[Dict[str, Any]]:
-        """잠재적 연결 대상 찾기"""
+                                   location: str = None, max_recommendations: int = 5) -> List[Dict[str, Any]]:
+        """잠재적 연결 대상(2촌)을 찾고, 필터링 및 점수 계산 후 최종 추천 목록 반환"""
         
-        # 2차, 3차 관계의 사용자들을 찾기
-        # 실제로는 더 복잡한 그래프 탐색 알고리즘 필요
-        
-        # 1차 관계 (직접 연결된 사용자들)
-        first_degree = Relationships.objects.filter(
+        # 1. 1차 관계 (직접 연결된 친구들) ID 목록 찾기
+        first_degree_qs = Relationships.objects.filter(
             Q(user_from_id=requester_id) | Q(user_to_id=requester_id),
             status='active'
         ).values_list('user_from_id', 'user_to_id')
         
-        connected_users = set()
-        for from_id, to_id in first_degree:
-            if from_id != requester_id:
-                connected_users.add(from_id)
-            if to_id != requester_id:
-                connected_users.add(to_id)
+        connected_users = {requester_id} # 요청자 자신도 포함하여 중복 추천 방지
+        for from_id, to_id in first_degree_qs:
+            connected_users.add(from_id)
+            connected_users.add(to_id)
         
-        recommendations = []
-        
-        # 2차 관계 찾기
-        for introducer_id in list(connected_users)[:10]:  # 성능을 위해 제한
-            second_degree = Relationships.objects.filter(
+        first_degree_friends = connected_users - {requester_id}
+        if not first_degree_friends:
+            return [] # 1촌 친구가 없으면 2촌도 없으므로 종료
+
+        # 2. 2차 관계 (친구의 친구들) 후보 찾기
+        # {후보자_id: 소개해준_친구_id} 형태로 저장하여 누가 소개해줬는지 추적
+        candidates = {}
+        for introducer_id in first_degree_friends:
+            second_degree_qs = Relationships.objects.filter(
                 Q(user_from_id=introducer_id) | Q(user_to_id=introducer_id),
                 status='active'
-            ).exclude(
-                Q(user_from_id=requester_id) | Q(user_to_id=requester_id)
             ).values_list('user_from_id', 'user_to_id')
-            
-            for from_id, to_id in second_degree:
-                candidate_id = from_id if from_id != introducer_id else to_id
-                
-                if candidate_id not in connected_users and candidate_id != requester_id:
-                    ai_score = self.calculate_ai_score(
-                        requester_id, candidate_id, introducer_id, 2, category
-                    )
-                    
-                    recommendations.append({
-                        'recommended_user': candidate_id,
-                        'introducer_user': introducer_id,
-                        'relationship_degree': 2,
-                        'ai_score': ai_score
-                    })
+
+            for from_id, to_id in second_degree_qs:
+                candidate_id = to_id if from_id == introducer_id else from_id
+                if candidate_id not in connected_users: # 이미 친구가 아닌 사람만 후보로 추가
+                    candidates[candidate_id] = introducer_id
         
-        # AI 점수 기준으로 정렬하고 상위 N개 반환
+        all_candidate_ids = list(candidates.keys())
+        if not all_candidate_ids:
+            return [] # 2촌 후보가 없으면 종료
+
+        # 3. Core 서비스에서 후보들의 프로필 정보를 일괄 조회
+        candidate_profiles = self._fetch_user_profiles_from_core_service(all_candidate_ids)
+
+        # 4. (선택사항) 동네 기반으로 후보 필터링
+        if location:
+            candidate_profiles = [
+                profile for profile in candidate_profiles
+                if profile.get('city_name') and location in profile.get('city_name')
+            ]
+        
+        # 5. 최종 추천 목록 생성 및 점수 계산
+        recommendations = []
+        for profile in candidate_profiles:
+            candidate_id = profile['id']
+            introducer_id = candidates[candidate_id]
+
+            ai_score = self.calculate_ai_score(
+                requester_id=requester_id, 
+                candidate_profile=profile, 
+                introducer_id=introducer_id,
+                relationship_degree=2, # 2촌 관계이므로 2로 고정
+                category=category
+            )
+            recommendations.append({
+                'recommended_user_id': candidate_id,
+                'introducer_user_id': introducer_id,
+                'relationship_degree': 2,
+                'ai_score': ai_score
+            })
+            
+        # 6. AI 점수 기준으로 정렬하고 상위 N개 반환
         recommendations.sort(key=lambda x: x['ai_score'], reverse=True)
         return recommendations[:max_recommendations]
     
@@ -147,9 +194,9 @@ class AIRecommendationService:
             status='pending'
         )
         
-        # 추천 생성
+        # 추천 생성 (location 파라미터 추가)
         potential_connections = self.find_potential_connections(
-            user_id, category, max_recommendations
+            user_id, category, location=None, max_recommendations=max_recommendations
         )
         
         recommendation_logs = []
