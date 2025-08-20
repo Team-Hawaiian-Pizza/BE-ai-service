@@ -88,7 +88,7 @@ class AIRecommendationService:
         Core 서비스의 /all API를 호출하여 모든 사용자 정보를 가져온 뒤,
         필요한 사용자들의 정보만 필터링하여 반환합니다.
         """
-        core_service_url = "http://core-service-address/all" # <-- API 주소를 /all로 변경
+        core_service_url = "http://core-service-address/all" # <-- 이 부분 변경 필요!!! (아직 배포가 안됐음)
         
         try:
             # params 없이 API를 호출하여 모든 사용자 정보를 가져옵니다.

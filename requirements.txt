@@ -8,3 +8,19 @@ python-dotenv==1.0.1
 gunicorn==23.0.0
 django-extensions==3.2.3
 google-generativeai==0.3.2
+requests==2.32.4
+
+# AWS 관련 패키지
+boto3==1.35.50
+botocore==1.35.50
+awscli==1.35.50
+
+# 배포 및 모니터링
+whitenoise==6.7.0
+psycopg2-binary==2.9.10
+django-storages==1.14.4
+pillow==10.4.0
+
+# 보안 및 성능
+django-ratelimit==4.1.0
+django-environ==0.11.2
