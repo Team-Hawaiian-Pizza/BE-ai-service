@@ -20,10 +20,17 @@ class AIRecommendationService:
         """Gemini API를 호출하여 카테고리를 추론하는 내부 메서드"""
         # Gemini에게 역할을 부여하고, 원하는 작업과 출력 형식을 명확히 지시
         system_prompt = """
-        당신은 '건너건너'라는 인맥 연결 서비스의 요청 분석 AI입니다.
-        사용자의 요청 텍스트를 분석하여 아래 6가지 카테고리 중 가장 적합한 것 하나만 골라 소문자로 답해주세요.
+        당신은 '건너건너'라는 생활 서비스 연결 플랫폼의 요청 분석 AI입니다.
+        사용자의 요청 텍스트를 분석하여 아래 6가지 생활 서비스 카테고리 중 가장 적합한 것 하나만 골라 소문자로 답해주세요.
         다른 설명은 절대 추가하지 마세요.
-        카테고리: business, networking, career, academic, hobby, personal
+        
+        카테고리:
+        - repair: 수리·유지보수 (전기, 배관, 가전제품, 샷시, 열쇠 등)
+        - cleaning: 청소·폐기 (입주청소, 쓰레기처리, 대청소 등)
+        - pest_control: 해충·방역 (바퀴벌레, 쥐, 모기, 소독 등)
+        - tech_service: 기술 서비스 (포스기, 와이파이, CCTV, 컴퓨터 등)
+        - life_helper: 생활 도우미 (짐나르기, 반려동물 산책, 심부름 등)
+        - senior_support: 고령자·외국인 지원 (번역, 관공서 동행, 병원 안내 등)
         """
         
         try:
@@ -37,22 +44,22 @@ class AIRecommendationService:
             category = response.text.strip().lower()
             
             # 유효한 카테고리인지 확인하는 안전장치
-            valid_categories = ['business', 'networking', 'career', 'academic', 'hobby', 'personal']
+            valid_categories = ['repair', 'cleaning', 'pest_control', 'tech_service', 'life_helper', 'senior_support']
             if category in valid_categories:
                 return category
-            return 'networking' # 유효하지 않은 답변일 경우 기본값 반환
+            return 'life_helper' # 유효하지 않은 답변일 경우 기본값 반환
 
         except Exception as e:
             print(f"Gemini API 호출 중 오류 발생: {e}")
-            return 'networking' # API 오류 시 기본값 반환    
+            return 'life_helper' # API 오류 시 기본값 반환    
         
     CATEGORIES = {
-        'business': ['사업', '비즈니스', '창업', '투자', '협업', '파트너'],
-        'networking': ['네트워킹', '인맥', '소개', '만남', '연결'],
-        'career': ['취업', '이직', '커리어', '직업', '진로', '멘토'],
-        'academic': ['학술', '연구', '논문', '학회', '교육', '대학'],
-        'hobby': ['취미', '관심사', '동호회', '클럽', '활동'],
-        'personal': ['개인적', '친구', '지인', '사적', '개인']
+        'repair': ['수리', '전기', '배관', '수도', '가전제품', '샷시', '유리', '문', '열쇠', '잠금장치', '벽', '타일', '싱크대', '고장', '수선'],
+        'cleaning': ['청소', '입주청소', '이사청소', '가게청소', '대청소', '쓰레기', '분리수거', '폐기물', '가구수거', '정리정돈'],
+        'pest_control': ['방역', '바퀴벌레', '쥐', '개미', '모기', '벌', '해충', '소독', '퇴치', '박멸'],
+        'tech_service': ['포스기', '프린터', '와이파이', 'CCTV', '앱', '컴퓨터', '기술지원', '설치', '점검', '수리'],
+        'life_helper': ['짐나르기', '반려동물', '산책', '벌레잡기', '심부름', '물건구매', '배송', '전달', '도움'],
+        'senior_support': ['번역', '통역', '어르신', '집수리', '관공서', '동행', '병원', '약국', '안내', '외국인지원']
     }
     
     def infer_category(self, request_text: str) -> str:
@@ -67,14 +74,14 @@ class AIRecommendationService:
         # 관계 거리가 가까울수록 높은 점수
         degree_score = max(0, (4 - relationship_degree) * 0.2)
         
-        # 카테고리별 가중치
+        # 카테고리별 가중치 (생활 서비스 중요도)
         category_weight = {
-            'business': 0.9,
-            'career': 0.8,
-            'academic': 0.7,
-            'networking': 0.8,
-            'hobby': 0.6,
-            'personal': 0.5
+            'repair': 0.9,          # 수리는 긴급성이 높음
+            'cleaning': 0.7,        # 청소 서비스
+            'pest_control': 0.8,    # 방역은 중요도 높음
+            'tech_service': 0.8,    # 기술 서비스
+            'life_helper': 0.6,     # 일반 생활 도우미
+            'senior_support': 0.9   # 고령자 지원은 우선도 높음
         }.get(category, 0.6)
         
         # 랜덤 요소 (실제로는 더 정교한 특성 기반 점수)

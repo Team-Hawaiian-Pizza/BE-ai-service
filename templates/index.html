@@ -472,8 +472,8 @@
 
     <!-- 히어로 섹션 -->
     <section class="hero-section">
-        <h1 class="hero-title">당신의 꿈을 이어줄<br>완벽한 인맥을 찾아드립니다</h1>
-        <p class="hero-subtitle">AI가 분석하는 스마트한 인맥 연결 서비스. 2차, 3차 인맥까지 탐색하여 가장 적합한 사람을 추천해드립니다.</p>
+        <h1 class="hero-title">일상의 문제를 해결할<br>완벽한 전문가를 찾아드립니다</h1>
+        <p class="hero-subtitle">AI가 분석하는 스마트한 생활 서비스 연결 플랫폼. 2차, 3차 인맥까지 탐색하여 가장 적합한 전문가를 추천해드립니다.</p>
         
         <!-- 검색 컨테이너 -->
         <div class="search-container">
@@ -481,22 +481,28 @@
                 <textarea 
                     class="search-input" 
                     id="searchInput"
-                    placeholder="어떤 분과 만나고 싶으신가요? 예: '스타트업 투자를 받고 싶어서 시드 투자자를 소개받고 싶어요', '프론트엔드 개발 경력을 쌓고 싶어서 시니어 개발자와 멘토링을 받고 싶습니다'"
+                    placeholder="어떤 생활 서비스가 필요하신가요? 예: '화장실 변기가 막혔는데 수리 전문가를 찾아요', '바퀴벌레 방역 해주실 분이 필요해요'"
                     rows="2"
                 ></textarea>
                 
                 <div class="search-suggestions">
-                    <div class="suggestion-chip" onclick="setSuggestion('스타트업 창업을 위한 시드 투자자를 소개받고 싶어요')">
-                        💼 투자자 연결
+                    <div class="suggestion-chip" onclick="setSuggestion('화장실 변기가 막혔는데 수리해줄 수 있는 분 찾아요')">
+                        🔧 수리·유지보수
                     </div>
-                    <div class="suggestion-chip" onclick="setSuggestion('프론트엔드 개발자로 이직하기 위한 멘토를 찾고 있어요')">
-                        💻 커리어 멘토링  
+                    <div class="suggestion-chip" onclick="setSuggestion('이사 청소 전문적으로 해주실 분 필요해요')">
+                        🧼 청소·폐기
                     </div>
-                    <div class="suggestion-chip" onclick="setSuggestion('AI 머신러닝 연구에 관심있는 대학원생과 연결하고 싶습니다')">
-                        🎓 학술 연구
+                    <div class="suggestion-chip" onclick="setSuggestion('바퀴벌레가 너무 많이 나와서 방역 전문가가 필요합니다')">
+                        🐜 해충·방역
                     </div>
-                    <div class="suggestion-chip" onclick="setSuggestion('같이 등산할 수 있는 취미 친구를 만나고 싶어요')">
-                        🏔️ 취미 친구
+                    <div class="suggestion-chip" onclick="setSuggestion('포스기 고장났는데 수리해줄 기술자 찾고 있어요')">
+                        🧑‍🔧 기술 서비스
+                    </div>
+                    <div class="suggestion-chip" onclick="setSuggestion('무거운 냉장고 옮기는 일 도와주실 분 구해요')">
+                        🧑‍🏭 생활 도우미
+                    </div>
+                    <div class="suggestion-chip" onclick="setSuggestion('할머니 병원 모시고 갈 분 찾습니다')">
+                        👨‍🦳 고령자 지원
                     </div>
                 </div>
                 
