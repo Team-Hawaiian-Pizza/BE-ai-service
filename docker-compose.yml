@@ -20,7 +20,7 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 20s
       retries: 10
-  env_file:
+    env_file:
       - ./.env
   web:
     build: .
