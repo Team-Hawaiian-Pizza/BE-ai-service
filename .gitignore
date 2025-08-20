@@ -37,6 +37,10 @@ staticfiles/
 .env.test.local
 .env.production.local
 
+# Backup files
+backup.sql
+*.sql
+
 # Virtual environment
 venv/
 env/
