@@ -29,4 +29,4 @@ RUN mkdir -p /app/staticfiles
 EXPOSE 8000
 
 # 기본 명령어
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "ai.wsgi:application"]
