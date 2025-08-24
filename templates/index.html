@@ -531,7 +531,7 @@
     </div>
 
     <script>
-        let currentUserId = Math.floor(Math.random() * 10000) + 1000; // 랜덤 사용자 ID
+        let currentUserId = 1; // 테스트용 사용자 ID (성시경)
 
         // 검색 제안 설정
         function setSuggestion(text) {
@@ -625,12 +625,12 @@
 
             // 카테고리 한글 변환
             const categoryNames = {
-                'business': '비즈니스',
-                'career': '커리어',
-                'academic': '학술/연구',
-                'networking': '네트워킹',
-                'hobby': '취미/관심사',
-                'personal': '개인적 만남'
+                'repair': '🔧 수리·유지보수',
+                'cleaning': '🧼 청소·폐기', 
+                'pest_control': '🐜 해충·방역',
+                'tech_service': '🧑‍🔧 기술 서비스',
+                'life_helper': '🧑‍🏭 생활 도우미',
+                'senior_support': '👨‍🦳 고령자·외국인 지원'
             };
 
             // 결과 헤더 생성
@@ -650,14 +650,22 @@
                     <div class="recommendation-card">
                         <div class="card-score">${Math.round(rec.ai_score * 100)}</div>
                         <div class="card-content">
-                            <h3>추천 ${index + 1}</h3>
+                            <h3>${rec.recommended_user.name || '익명'}</h3>
                             <div class="card-detail">
                                 <span class="card-detail-icon">👤</span>
-                                사용자 #${rec.recommended_user}
+                                ${rec.recommended_user.age_band || '미정'} • ${rec.recommended_user.gender || '미정'}
+                            </div>
+                            <div class="card-detail">
+                                <span class="card-detail-icon">📍</span>
+                                ${rec.recommended_user.city_name || '미정'}
+                            </div>
+                            <div class="card-detail">
+                                <span class="card-detail-icon">💬</span>
+                                ${rec.recommended_user.intro || '소개글이 없습니다.'}
                             </div>
                             <div class="card-detail">
                                 <span class="card-detail-icon">🤝</span>
-                                소개자: 사용자 #${rec.introducer_user}
+                                소개자: ${rec.introducer_user.name || '익명'}
                             </div>
                             <div class="card-detail">
                                 <span class="card-detail-icon">🔗</span>

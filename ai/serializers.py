@@ -24,7 +24,28 @@ class RecommendationRequestSerializer(serializers.Serializer):
     request_text = serializers.CharField(max_length=1000)
     max_recommendations = serializers.IntegerField(default=5, min_value=1, max_value=10)
 
+class UserProfileSerializer(serializers.Serializer):
+    """Core 서비스의 사용자 프로필"""
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    name = serializers.CharField()
+    email = serializers.EmailField()
+    province_name = serializers.CharField()
+    city_name = serializers.CharField()
+    gender = serializers.CharField()
+    age_band = serializers.CharField()
+    intro = serializers.CharField()
+    manner_temperature = serializers.IntegerField()
+
+class EnhancedRecommendationSerializer(serializers.Serializer):
+    """추천 결과 + 사용자 프로필 정보"""
+    id = serializers.IntegerField()
+    recommended_user = UserProfileSerializer()
+    introducer_user = UserProfileSerializer()
+    relationship_degree = serializers.IntegerField()
+    ai_score = serializers.FloatField()
+
 class RecommendationResponseSerializer(serializers.Serializer):
     request_id = serializers.IntegerField()
-    recommendations = RecommendationLogSerializer(many=True)
+    recommendations = EnhancedRecommendationSerializer(many=True)
     inferred_category = serializers.CharField()

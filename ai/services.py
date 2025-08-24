@@ -98,62 +98,128 @@ class AIRecommendationService:
         core_service_url = "http://13.124.106.69:8000/users/all" 
         
         try:
-            # params 없이 API를 호출하여 모든 사용자 정보를 가져옵니다.
-            response = requests.get(core_service_url, timeout=10) 
-            response.raise_for_status() 
-            all_users = response.json()
+            # Core Service API 호출
+            headers = {
+                'User-Agent': 'Django-AI-Service/1.0',
+                'Accept': 'application/json'
+            }
             
-            # 파이썬 코드로 필요한 user_id를 가진 사용자 정보만 필터링합니다.
+            response = requests.get(core_service_url, timeout=10, headers=headers)
+            response.raise_for_status() 
+            api_data = response.json()
+            
+            # API 응답에서 results 키의 사용자 리스트를 가져옵니다.
+            all_users = api_data.get('results', [])
+            
+            # 필요한 user_id만 필터링
             user_ids_set = set(user_ids)
             filtered_users = [
                 user for user in all_users 
                 if user.get('id') in user_ids_set
             ]
+            
+            print(f"[INFO] Core 서비스에서 {len(filtered_users)}명 사용자 정보 가져옴")
             return filtered_users
 
         except requests.exceptions.RequestException as e:
-            print(f"Core 서비스 호출 중 오류 발생: {e}")
+            print(f"[ERROR] Core 서비스 호출 실패: {e}")
+            return []
+            
+        except Exception as e:
+            print(f"[ERROR] 예상치 못한 오류: {e}")
             return []
     
+    def _fetch_network_graph_from_core_service(self, center_user_id: int, depth: int = 2) -> Dict[str, Any]:
+        """Core 서비스에서 네트워크 그래프 데이터를 가져오는 메서드"""
+        core_graph_url = f"http://13.124.106.69:8000/network/graph?depth={depth}&format=api"
+        
+        try:
+            headers = {
+                'User-Agent': 'Django-AI-Service/1.0',
+                'Accept': 'application/json'
+            }
+            
+            # center_user_id 파라미터 추가 필요 시 (API 문서에 따라)
+            params = {'center': center_user_id} if center_user_id else {}
+            
+            response = requests.get(core_graph_url, params=params, timeout=10, headers=headers)
+            response.raise_for_status()
+            graph_data = response.json()
+            
+            print(f"[INFO] Core 서비스에서 네트워크 그래프 데이터 가져옴 - 노드: {len(graph_data.get('nodes', []))}, 엣지: {len(graph_data.get('edges', []))}")
+            return graph_data
+            
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Core 서비스 네트워크 그래프 호출 실패: {e}")
+            return {}
+            
+        except Exception as e:
+            print(f"[ERROR] 네트워크 그래프 조회 중 예상치 못한 오류: {e}")
+            return {}
+
     def find_potential_connections(self, requester_id: int, category: str, 
                                    location: str = None, max_recommendations: int = 5) -> List[Dict[str, Any]]:
         """잠재적 연결 대상(2촌)을 찾고, 필터링 및 점수 계산 후 최종 추천 목록 반환"""
         
-        # 1. 1차 관계 (직접 연결된 친구들) ID 목록 찾기
-        first_degree_qs = Relationships.objects.filter(
-            Q(user_from_id=requester_id) | Q(user_to_id=requester_id),
-            status='active'
-        ).values_list('user_from_id', 'user_to_id')
+        print(f"[DEBUG] 추천 시작 - 요청자: {requester_id}, 카테고리: {category}")
         
-        connected_users = {requester_id} # 요청자 자신도 포함하여 중복 추천 방지
-        for from_id, to_id in first_degree_qs:
-            connected_users.add(from_id)
-            connected_users.add(to_id)
+        # 1. Core 서비스에서 네트워크 그래프 데이터 가져오기
+        graph_data = self._fetch_network_graph_from_core_service(requester_id, depth=2)
         
-        first_degree_friends = connected_users - {requester_id}
+        if not graph_data or 'edges' not in graph_data:
+            print(f"[DEBUG] 네트워크 그래프 데이터를 가져올 수 없어서 추천 종료")
+            return []
+        
+        edges = graph_data['edges']
+        center_user = graph_data.get('center', requester_id)
+        
+        print(f"[DEBUG] 네트워크 그래프 - 중심: {center_user}, 엣지 수: {len(edges)}")
+        
+        # 2. 1차 관계 (직접 연결된 친구들) 찾기
+        first_degree_friends = set()
+        for edge in edges:
+            source = edge['source']
+            target = edge['target']
+            
+            if source == requester_id:
+                first_degree_friends.add(target)
+            elif target == requester_id:
+                first_degree_friends.add(source)
+        
+        print(f"[DEBUG] 1촌 친구들: {first_degree_friends}")
+        
         if not first_degree_friends:
-            return [] # 1촌 친구가 없으면 2촌도 없으므로 종료
+            print(f"[DEBUG] 1촌 친구가 없어서 추천 종료")
+            return []
 
-        # 2. 2차 관계 (친구의 친구들) 후보 찾기
-        # {후보자_id: 소개해준_친구_id} 형태로 저장하여 누가 소개해줬는지 추적
-        candidates = {}
+        # 3. 2차 관계 (친구의 친구들) 후보 찾기
+        candidates = {}  # {후보자_id: 소개해준_친구_id}
+        connected_users = {requester_id} | first_degree_friends  # 이미 연결된 사용자들
+        
         for introducer_id in first_degree_friends:
-            second_degree_qs = Relationships.objects.filter(
-                Q(user_from_id=introducer_id) | Q(user_to_id=introducer_id),
-                status='active'
-            ).values_list('user_from_id', 'user_to_id')
-
-            for from_id, to_id in second_degree_qs:
-                candidate_id = to_id if from_id == introducer_id else from_id
-                if candidate_id not in connected_users: # 이미 친구가 아닌 사람만 후보로 추가
+            for edge in edges:
+                source = edge['source']
+                target = edge['target']
+                
+                candidate_id = None
+                if source == introducer_id and target not in connected_users:
+                    candidate_id = target
+                elif target == introducer_id and source not in connected_users:
+                    candidate_id = source
+                
+                if candidate_id and candidate_id not in candidates:
                     candidates[candidate_id] = introducer_id
         
         all_candidate_ids = list(candidates.keys())
+        print(f"[DEBUG] 2촌 후보들: {candidates}")
+        
         if not all_candidate_ids:
+            print(f"[DEBUG] 2촌 후보가 없어서 추천 종료")
             return [] # 2촌 후보가 없으면 종료
 
         # 3. Core 서비스에서 후보들의 프로필 정보를 일괄 조회
         candidate_profiles = self._fetch_user_profiles_from_core_service(all_candidate_ids)
+        print(f"[DEBUG] Core 서비스에서 가져온 프로필 수: {len(candidate_profiles)}")
 
         # 4. (선택사항) 동네 기반으로 후보 필터링
         if location:
@@ -184,7 +250,9 @@ class AIRecommendationService:
             
         # 6. AI 점수 기준으로 정렬하고 상위 N개 반환
         recommendations.sort(key=lambda x: x['ai_score'], reverse=True)
-        return recommendations[:max_recommendations]
+        final_recommendations = recommendations[:max_recommendations]
+        print(f"[DEBUG] 최종 추천 결과: {len(final_recommendations)}개")
+        return final_recommendations
     
     def create_recommendation_request(self, user_id: int, request_text: str, 
                                    max_recommendations: int = 5) -> Dict[str, Any]:
@@ -207,7 +275,20 @@ class AIRecommendationService:
         )
         
         recommendation_logs = []
+        enhanced_recommendations = []
+        
+        # 모든 관련 사용자 ID 수집 (추천자 + 소개자)
+        all_user_ids = set()
         for conn in potential_connections:
+            all_user_ids.add(conn['recommended_user_id'])
+            all_user_ids.add(conn['introducer_user_id'])
+        
+        # Core 서비스에서 사용자 프로필 가져오기
+        user_profiles = self._fetch_user_profiles_from_core_service(list(all_user_ids))
+        user_profile_dict = {profile['id']: profile for profile in user_profiles}
+        
+        for conn in potential_connections:
+            # 데이터베이스에 로그 저장
             log = RecommendationLog.objects.create(
                 request=connection_request,
                 recommended_user=conn['recommended_user_id'],
@@ -216,9 +297,19 @@ class AIRecommendationService:
                 ai_score=conn['ai_score']
             )
             recommendation_logs.append(log)
+            
+            # 프론트엔드용 향상된 추천 데이터 생성
+            enhanced_rec = {
+                'id': log.id,
+                'recommended_user': user_profile_dict.get(conn['recommended_user_id'], {}),
+                'introducer_user': user_profile_dict.get(conn['introducer_user_id'], {}),
+                'relationship_degree': conn['relationship_degree'],
+                'ai_score': conn['ai_score']
+            }
+            enhanced_recommendations.append(enhanced_rec)
         
         return {
             'request_id': connection_request.id,
-            'recommendations': recommendation_logs,
+            'recommendations': enhanced_recommendations,  # 향상된 데이터 사용
             'inferred_category': category
         }
