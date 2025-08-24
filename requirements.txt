@@ -2,6 +2,9 @@
 Django
 djangorestframework
 gunicorn
+pandas
+scikit-learn
+joblib
 
 # --- Database & Cache ---
 mysqlclient

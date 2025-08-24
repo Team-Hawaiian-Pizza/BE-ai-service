@@ -1,6 +1,9 @@
 import random
 import os
+import joblib
+import pandas as pd
 import requests
+from django.conf import settings
 from typing import List, Dict, Any
 from django.db.models import Q
 from .models import Relationships, ConnectionRequest, RecommendationLog
@@ -18,12 +21,27 @@ class AIRecommendationService:
             raise ValueError("GOOGLE_API_KEY가 설정되지 않았습니다.")
         genai.configure(api_key=api_key) # Gemini 설정 방식으로 변경
         
+        # 머신러닝 모델 로딩 
+        model_path = os.path.join(settings.BASE_DIR, 'ml_models', 'recommendation_model.joblib')
+        try:
+            self.model = joblib.load(model_path)
+            # 모델에서 직접 feature names 가져오기
+            self.model_columns = list(self.model.feature_names_in_)
+            logger.info(f"추천 모델 로딩 성공: {len(self.model_columns)}개 features")
+            logger.info(f"Features: {self.model_columns}")
+        except FileNotFoundError:
+            self.model = None
+            logger.error(f"모델 파일을 찾을 수 없습니다: {model_path}")
+        except Exception as e:
+            self.model = None
+            logger.error(f"모델 로딩 실패: {e}")
+        
     def _call_gemini_api(self, request_text: str) -> str:
         """Gemini API를 호출하여 카테고리를 추론하는 내부 메서드"""
         # Gemini에게 역할을 부여하고, 원하는 작업과 출력 형식을 명확히 지시
         system_prompt = """
         당신은 '건너건너'라는 생활 서비스 연결 플랫폼의 요청 분석 AI입니다.
-        사용자의 요청 텍스트를 분석하여 아래 6가지 생활 서비스 카테고리 중 가장 적합한 것 하나만 골라 소문자로 답해주세요.
+        사용자의 요청 텍스트를 분석하여 아래 6가지 생활 서비스 카테고리 중 가장 적합한 것 하나만 골라 적절한 답으로 답해주세요.
         다른 설명은 절대 추가하지 마세요.
         
         카테고리:
@@ -86,21 +104,24 @@ class AIRecommendationService:
         return 'life_helper'  # 기본값
     
     def _calculate_profile_match_score(self, request_text: str, category: str, candidate_profile: Dict[str, Any]) -> float:
-        """요청 내용과 후보자 프로필의 매칭 점수 계산"""
+        """요청 내용과 후보자 프로필의 매칭 점수 계산 - 개선된 intro 분석"""
         intro = candidate_profile.get('intro', '').lower()
         name = candidate_profile.get('name', '').lower()
         
         if not intro:
             return 0.0
         
-        # 카테고리별 핵심 키워드 정의 (1차 매칭)
+        # 요청 텍스트에서 핵심 키워드 추출
+        request_keywords = set(request_text.lower().replace(',', ' ').replace('.', ' ').split())
+        
+        # 카테고리별 핵심 키워드 정의 (1차 매칭) - 더욱 확장된 키워드
         primary_keywords = {
-            'repair': ['수리', '전기', '배관', '수도', '가전', '고장', '수선', '보수', '정비', '교체'],
-            'cleaning': ['청소', '정리', '대청소', '입주청소', '이사청소', '비우기', '정돈'],
-            'pest_control': ['방역', '바퀴벌레', '쥐', '개미', '모기', '벌', '해충', '소독', '퇴치', '박멸'],
-            'tech_service': ['포스기', '프린터', '와이파이', 'cctv', '앱', '컴퓨터', '기술', '설치', '점검'],
-            'life_helper': ['짐나르기', '반려동물', '산책', '심부름', '물건구매', '배송', '전달', '도움', '서비스'],
-            'senior_support': ['번역', '통역', '어르신', '관공서', '동행', '병원', '약국', '안내', '지원']
+            'repair': ['수리', '전기', '배관', '수도', '가전', '고장', '수선', '보수', '정비', '교체', '냉장고', '세탁기', 'tv', '에어컨', '보일러', '온수기', '기사', 'repair', 'fix', 'broken', 'plumbing', 'electrical'],
+            'cleaning': ['청소', '정리', '대청소', '입주청소', '이사청소', '비우기', '정돈', '깔끔', 'clean', 'cleaning', 'organize'],
+            'pest_control': ['방역', '바퀴벌레', '쥐', '개미', '모기', '벌', '해충', '소독', '퇴치', '박멸', 'pest', 'cockroach', 'ant', 'control'],
+            'tech_service': ['포스기', '프린터', '와이파이', 'cctv', '앱', '컴퓨터', '기술', '설치', '점검', 'wifi', 'install', 'tech', '전자제품'],
+            'life_helper': ['짐나르기', '반려동물', '산책', '심부름', '물건구매', '배송', '전달', '도움', '서비스', '알바', '대행', '촬영', '사진'],
+            'senior_support': ['번역', '통역', '어르신', '관공서', '동행', '병원', '약국', '안내', '지원', 'translate', '외국인']
         }
         
         # 2차 연관 키워드 정의 (관련 있지만 우선순위 낮음)
@@ -118,16 +139,21 @@ class AIRecommendationService:
         
         match_score = 0.0
         
-        # 1차 키워드 매칭 (높은 가중치)
+        # 1차: 직접 요청 키워드 매칭 (최고 가중치)
+        direct_matches = 0
+        for req_word in request_keywords:
+            if len(req_word) > 2 and req_word in intro:  # 3글자 이상만 유효
+                direct_matches += 1
+                match_score += 0.5  # 직접 매칭 시 높은 점수
+        
+        # 2차: 카테고리별 핵심 키워드 매칭 (높은 가중치)
         primary_matches = 0
         for keyword in primary_keywords.get(category, []):
             if keyword in intro:
                 primary_matches += 1
-                # 요청 텍스트와 직접 매칭되면 추가 점수
-                if any(req_word in keyword or keyword in req_word for req_word in request_keywords):
-                    match_score += 0.3
-                else:
-                    match_score += 0.2
+                # 요청 텍스트와 연관성 체크
+                is_related = any(req_word in keyword or keyword in req_word for req_word in request_keywords if len(req_word) > 2)
+                match_score += 0.4 if is_related else 0.25
         
         # 2차 키워드 매칭 (중간 가중치)  
         secondary_matches = 0
@@ -155,8 +181,47 @@ class AIRecommendationService:
         return min(1.0, match_score)
     
     def calculate_ai_score(self, requester_id: int, candidate_profile: Dict[str, Any], introducer_id: int, 
-                          relationship_degree: int, category: str, request_text: str = "") -> float:
-        """개선된 AI 점수 계산 - 프로필 매칭 기반"""
+                        relationship_degree: int, category: str, request_text: str = "",
+                        requester_profile: Dict[str, Any] = None) -> float: # <-- requester_profile 추가
+        """[개선된 버전] ML 모델을 사용하여 AI 점수(성공 확률)를 계산합니다."""
+        
+        if not self.model:
+            raise ValueError("추천 모델이 로드되지 않았습니다. 서비스를 초기화할 수 없습니다.")
+
+        try:
+            # 1. 모델에 입력할 원시 데이터 준비
+            # '30s' 대신 실제 요청자의 나이대(age_band)를 사용합니다.
+            requester_age_band = requester_profile.get('age_band', '30s') if requester_profile else '30s' # <-- 변경된 부분
+            
+            input_data = {
+                'relationship_degree': relationship_degree,
+                'category': category,
+                'requester_age': requester_age_band, # <-- 변경된 부분
+                'candidate_gender': candidate_profile.get('gender', 'male')
+            }
+            
+            # --- (이하 로직은 기존과 동일) ---
+            input_df = pd.DataFrame([input_data])
+            input_encoded = pd.get_dummies(input_df)
+            input_final = input_encoded.reindex(columns=self.model_columns, fill_value=0)
+            
+            ml_score = self.model.predict_proba(input_final)[0, 1]
+            
+            profile_match_score = self._calculate_profile_match_score(request_text, category, candidate_profile)
+            
+            profile_weight = 1.0 + profile_match_score * 0.5
+            final_score = ml_score * profile_weight
+            
+            return round(float(min(1.0, final_score)), 3)
+
+        except Exception as e:
+            logger.error(f"ML 모델 점수 계산 중 오류 발생: {e}")
+            raise RuntimeError(f"ML 모델 점수 계산 실패: {e}")
+    
+    def _calculate_rule_based_score(self, requester_id: int, candidate_profile: Dict[str, Any], 
+                                  introducer_id: int, relationship_degree: int, category: str, 
+                                  request_text: str = "") -> float:
+        """기존 규칙 기반 AI 점수 계산 (ML 모델의 백업용)"""
         base_score = 0.4  # 기본 점수를 높여서 기본 추천도 가능하게
         
         # 1. 관계 거리 점수 (가까울수록 높음)
@@ -175,22 +240,11 @@ class AIRecommendationService:
             'senior_support': 0.2   # 고령자 지원
         }.get(category, 0.1)
         
-        # 4. 지역 매칭 보너스
-        location_bonus = 0.0
-        candidate_city = candidate_profile.get('city_name', '')
-        if candidate_city:
-            location_bonus = 0.05  # 같은 지역이면 약간의 보너스
+        # 4. 최종 점수 계산 (프로필 매칭을 가장 중요시)
+        final_score = base_score + degree_score + (profile_match_score * 0.6) + category_weight
         
-        # 최종 점수 계산 (프로필 매칭이 가장 큰 비중)
-        final_score = (
-            base_score + 
-            degree_score + 
-            (profile_match_score * 0.6) +  # 60% 가중치
-            (category_weight * 0.2) + 
-            location_bonus
-        )
-        
-        return round(min(1.0, max(0.0, final_score)), 3)
+        # 5. 최종 점수 정규화 (0.0 ~ 1.0)
+        return min(1.0, max(0.0, final_score))
     
     def _fetch_user_profiles_from_core_service(self, user_ids: List[int]) -> List[Dict[str, Any]]:
         """
@@ -254,65 +308,37 @@ class AIRecommendationService:
             return {}
 
     def find_potential_connections(self, requester_id: int, category: str, request_text: str = "",
-                                   location: str = None, max_recommendations: int = 5) -> List[Dict[str, Any]]:
+                                location: str = None, max_recommendations: int = 5,
+                                requester_profile: Dict[str, Any] = None) -> List[Dict[str, Any]]: # <-- requester_profile 추가
         """잠재적 연결 대상(2촌)을 찾고, 필터링 및 점수 계산 후 최종 추천 목록 반환"""
         
-        # 1. Core 서비스에서 네트워크 그래프 데이터 가져오기
+        # --- (그래프 조회 및 후보 찾는 로직은 기존과 동일) ---
         graph_data = self._fetch_network_graph_from_core_service(requester_id, depth=2)
-        
         if not graph_data or 'edges' not in graph_data:
             return []
-        
         edges = graph_data['edges']
-        center_user = graph_data.get('center', requester_id)
-        
-        # 2. 1차 관계 (직접 연결된 친구들) 찾기
         first_degree_friends = set()
         for edge in edges:
-            source = edge['source']
-            target = edge['target']
-            
-            if source == requester_id:
-                first_degree_friends.add(target)
-            elif target == requester_id:
-                first_degree_friends.add(source)
-        
-        if not first_degree_friends:
-            return []
+            source, target = edge['source'], edge['target']
+            if source == requester_id: first_degree_friends.add(target)
+            elif target == requester_id: first_degree_friends.add(source)
+        if not first_degree_friends: return []
 
-        # 3. 2차 관계 (친구의 친구들) 후보 찾기
-        candidates = {}  # {후보자_id: 소개해준_친구_id}
-        connected_users = {requester_id} | first_degree_friends  # 이미 연결된 사용자들
-        
+        candidates = {}
+        connected_users = {requester_id} | first_degree_friends
         for introducer_id in first_degree_friends:
             for edge in edges:
-                source = edge['source']
-                target = edge['target']
-                
+                source, target = edge['source'], edge['target']
                 candidate_id = None
-                if source == introducer_id and target not in connected_users:
-                    candidate_id = target
-                elif target == introducer_id and source not in connected_users:
-                    candidate_id = source
-                
-                if candidate_id and candidate_id not in candidates:
-                    candidates[candidate_id] = introducer_id
-        
+                if source == introducer_id and target not in connected_users: candidate_id = target
+                elif target == introducer_id and source not in connected_users: candidate_id = source
+                if candidate_id and candidate_id not in candidates: candidates[candidate_id] = introducer_id
         all_candidate_ids = list(candidates.keys())
-        
-        if not all_candidate_ids:
-            return [] # 2촌 후보가 없으면 종료
-
-        # 3. Core 서비스에서 후보들의 프로필 정보를 일괄 조회
+        if not all_candidate_ids: return []
         candidate_profiles = self._fetch_user_profiles_from_core_service(all_candidate_ids)
-
-        # 4. (선택사항) 동네 기반으로 후보 필터링
         if location:
-            candidate_profiles = [
-                profile for profile in candidate_profiles
-                if profile.get('city_name') and location in profile.get('city_name')
-            ]
-        
+            candidate_profiles = [p for p in candidate_profiles if p.get('city_name') and location in p.get('city_name')]
+
         # 5. 최종 추천 목록 생성 및 점수 계산
         recommendations = []
         for profile in candidate_profiles:
@@ -323,9 +349,10 @@ class AIRecommendationService:
                 requester_id=requester_id, 
                 candidate_profile=profile, 
                 introducer_id=introducer_id,
-                relationship_degree=2, # 2촌 관계이므로 2로 고정
+                relationship_degree=2,
                 category=category,
-                request_text=request_text
+                request_text=request_text,
+                requester_profile=requester_profile  # <-- 변경된 부분: requester_profile 전달
             )
             recommendations.append({
                 'recommended_user_id': candidate_id,
@@ -334,9 +361,14 @@ class AIRecommendationService:
                 'ai_score': ai_score
             })
             
-        # 6. AI 점수 기준으로 정렬하고 상위 N개 반환
+        # --- (정렬 및 필터링 로직은 기존과 동일) ---
         recommendations.sort(key=lambda x: x['ai_score'], reverse=True)
-        return recommendations[:max_recommendations]
+        if not recommendations: return []
+        top_score = recommendations[0]['ai_score']
+        min_threshold = max(0.4, top_score * 0.7)
+        filtered_recommendations = [rec for rec in recommendations if rec['ai_score'] >= min_threshold]
+        return filtered_recommendations[:max_recommendations]
+
     
     def create_recommendation_request(self, user_id: int, request_text: str, 
                                    max_recommendations: int = 5) -> Dict[str, Any]:
@@ -344,6 +376,14 @@ class AIRecommendationService:
         
         # 카테고리 추론
         category = self.infer_category(request_text)
+        
+        # 1. 요청자 프로필 가져오기 (추가된 부분)
+        requester_profiles = self._fetch_user_profiles_from_core_service([user_id])
+        if not requester_profiles:
+            logger.error(f"요청자 프로필을 찾을 수 없습니다: user_id={user_id}")
+            return {'request_id': None, 'recommendations': [], 'inferred_category': category}
+    
+        requester_profile = requester_profiles[0]
         
         # 연결 요청 생성
         connection_request = ConnectionRequest.objects.create(
@@ -355,7 +395,12 @@ class AIRecommendationService:
         
         # 추천 생성 (request_text와 location 파라미터 추가)
         potential_connections = self.find_potential_connections(
-            user_id, category, request_text=request_text, location=None, max_recommendations=max_recommendations
+            requester_id=user_id, 
+            category=category, 
+            request_text=request_text, 
+            location=None, 
+            max_recommendations=max_recommendations,
+            requester_profile=requester_profile
         )
         
         recommendation_logs = []
