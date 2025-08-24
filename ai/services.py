@@ -131,22 +131,20 @@ class AIRecommendationService:
     
     def _fetch_network_graph_from_core_service(self, center_user_id: int, depth: int = 2) -> Dict[str, Any]:
         """Core 서비스에서 네트워크 그래프 데이터를 가져오는 메서드"""
-        core_graph_url = f"http://13.124.106.69:8000/network/graph?depth={depth}&format=api"
+        core_graph_url = f"http://13.124.106.69:8000/network/graph"
         
         try:
-            headers = {
-                'User-Agent': 'Django-AI-Service/1.0',
-                'Accept': 'application/json'
+            params = {
+                'depth': depth,
+                'format': 'json',
+                'center': center_user_id
             }
             
-            # center_user_id 파라미터 추가 필요 시 (API 문서에 따라)
-            params = {'center': center_user_id} if center_user_id else {}
-            
-            response = requests.get(core_graph_url, params=params, timeout=10, headers=headers)
+            response = requests.get(core_graph_url, params=params, timeout=10)
             response.raise_for_status()
             graph_data = response.json()
             
-            print(f"[INFO] Core 서비스에서 네트워크 그래프 데이터 가져옴 - 노드: {len(graph_data.get('nodes', []))}, 엣지: {len(graph_data.get('edges', []))}")
+            print(f"[INFO] Core 서비스에서 네트워크 그래프 데이터 가져옴 - 중심: {graph_data.get('center')}, 노드: {len(graph_data.get('nodes', []))}, 엣지: {len(graph_data.get('edges', []))}")
             return graph_data
             
         except requests.exceptions.RequestException as e:
