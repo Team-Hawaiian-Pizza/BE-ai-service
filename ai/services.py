@@ -57,31 +57,140 @@ class AIRecommendationService:
     
     def infer_category(self, request_text: str) -> str:
         """요청 텍스트에서 카테고리 추론"""
-        return self._call_gemini_api(request_text)
+        # 1차: Gemini API 시도
+        gemini_result = self._call_gemini_api(request_text)
+        if gemini_result != 'life_helper':  # 기본값이 아니면 성공
+            return gemini_result
+            
+        # 2차: 로컬 키워드 기반 추론 (API 실패 시 대안)
+        return self._infer_category_locally(request_text)
+    
+    def _infer_category_locally(self, request_text: str) -> str:
+        """로컬 키워드 기반 카테고리 추론 (Gemini API 대안)"""
+        text = request_text.lower()
+        
+        # 키워드 기반 카테고리 매칭
+        category_keywords = {
+            'pest_control': ['바퀴벌레', 'cockroach', '쥐', 'rat', '방역', 'pest', '해충', '소독', '개미', 'ant'],
+            'repair': ['수리', 'repair', 'fix', '고장', '전기', 'electrical', '배관', 'plumbing', '가전'],
+            'cleaning': ['청소', 'clean', '정리', 'organize', '이사', 'moving', '입주청소', '대청소'],
+            'tech_service': ['cctv', '와이파이', 'wifi', '컴퓨터', 'computer', '포스기', '설치', 'install'],
+            'senior_support': ['번역', 'translate', '통역', '병원', 'hospital', '관공서', '동행', '어르신'],
+            'life_helper': ['심부름', '배송', 'delivery', '짐나르기', '반려동물', 'pet', '도움']
+        }
+        
+        for category, keywords in category_keywords.items():
+            if any(keyword in text for keyword in keywords):
+                return category
+                
+        return 'life_helper'  # 기본값
+    
+    def _calculate_profile_match_score(self, request_text: str, category: str, candidate_profile: Dict[str, Any]) -> float:
+        """요청 내용과 후보자 프로필의 매칭 점수 계산"""
+        intro = candidate_profile.get('intro', '').lower()
+        name = candidate_profile.get('name', '').lower()
+        
+        if not intro:
+            return 0.0
+        
+        # 카테고리별 핵심 키워드 정의 (1차 매칭)
+        primary_keywords = {
+            'repair': ['수리', '전기', '배관', '수도', '가전', '고장', '수선', '보수', '정비', '교체'],
+            'cleaning': ['청소', '정리', '대청소', '입주청소', '이사청소', '비우기', '정돈'],
+            'pest_control': ['방역', '바퀴벌레', '쥐', '개미', '모기', '벌', '해충', '소독', '퇴치', '박멸'],
+            'tech_service': ['포스기', '프린터', '와이파이', 'cctv', '앱', '컴퓨터', '기술', '설치', '점검'],
+            'life_helper': ['짐나르기', '반려동물', '산책', '심부름', '물건구매', '배송', '전달', '도움', '서비스'],
+            'senior_support': ['번역', '통역', '어르신', '관공서', '동행', '병원', '약국', '안내', '지원']
+        }
+        
+        # 2차 연관 키워드 정의 (관련 있지만 우선순위 낮음)
+        secondary_keywords = {
+            'repair': ['도구', '전문가', '기사', '숙련', '경험'],
+            'cleaning': ['깔끔', '완벽', '꼼꼼', '청결', '위생'],
+            'pest_control': ['전문', '안전', '효과적', '깨끗'],
+            'tech_service': ['전문가', '신속', '숙련', '해결'],
+            'life_helper': ['친절', '빠른', '안전', '신뢰'],
+            'senior_support': ['정중', '친절', '배려', '세심']
+        }
+        
+        # 요청 텍스트에서 중요한 키워드 추출
+        request_keywords = set(request_text.lower().split())
+        
+        match_score = 0.0
+        
+        # 1차 키워드 매칭 (높은 가중치)
+        primary_matches = 0
+        for keyword in primary_keywords.get(category, []):
+            if keyword in intro:
+                primary_matches += 1
+                # 요청 텍스트와 직접 매칭되면 추가 점수
+                if any(req_word in keyword or keyword in req_word for req_word in request_keywords):
+                    match_score += 0.3
+                else:
+                    match_score += 0.2
+        
+        # 2차 키워드 매칭 (중간 가중치)  
+        secondary_matches = 0
+        for keyword in secondary_keywords.get(category, []):
+            if keyword in intro:
+                secondary_matches += 1
+                match_score += 0.1
+        
+        # 다른 카테고리 키워드 매칭 (낮은 가중치 - 2순위)
+        for other_category, keywords in primary_keywords.items():
+            if other_category != category:
+                for keyword in keywords:
+                    if keyword in intro:
+                        match_score += 0.05  # 관련 분야로 2순위
+        
+        # 매너온도 보정 (높은 매너온도 = 신뢰도 높음)
+        manner_temp = candidate_profile.get('manner_temperature', 50)
+        if manner_temp >= 70:
+            match_score += 0.1
+        elif manner_temp >= 60:
+            match_score += 0.05
+        elif manner_temp <= 40:
+            match_score -= 0.1
+        
+        return min(1.0, match_score)
     
     def calculate_ai_score(self, requester_id: int, candidate_profile: Dict[str, Any], introducer_id: int, 
-                          relationship_degree: int, category: str) -> float:
-        """AI 점수 계산 (실제로는 ML 모델을 사용해야 함)"""
-        base_score = 0.5
+                          relationship_degree: int, category: str, request_text: str = "") -> float:
+        """개선된 AI 점수 계산 - 프로필 매칭 기반"""
+        base_score = 0.4  # 기본 점수를 높여서 기본 추천도 가능하게
         
-        # 관계 거리가 가까울수록 높은 점수
-        degree_score = max(0, (4 - relationship_degree) * 0.2)
+        # 1. 관계 거리 점수 (가까울수록 높음)
+        degree_score = max(0, (4 - relationship_degree) * 0.15)
         
-        # 카테고리별 가중치 (생활 서비스 중요도)
+        # 2. 프로필 매칭 점수 (가장 중요한 요소)
+        profile_match_score = self._calculate_profile_match_score(request_text, category, candidate_profile)
+        
+        # 3. 카테고리별 기본 가중치 
         category_weight = {
-            'repair': 0.9,          # 수리는 긴급성이 높음
-            'cleaning': 0.7,        # 청소 서비스
-            'pest_control': 0.8,    # 방역은 중요도 높음
-            'tech_service': 0.8,    # 기술 서비스
-            'life_helper': 0.6,     # 일반 생활 도우미
-            'senior_support': 0.9   # 고령자 지원은 우선도 높음
-        }.get(category, 0.6)
+            'repair': 0.2,          # 수리
+            'cleaning': 0.15,       # 청소 
+            'pest_control': 0.2,    # 방역
+            'tech_service': 0.2,    # 기술 서비스
+            'life_helper': 0.1,     # 생활 도우미
+            'senior_support': 0.2   # 고령자 지원
+        }.get(category, 0.1)
         
-        # 랜덤 요소 (실제로는 더 정교한 특성 기반 점수)
-        random_factor = random.uniform(0.1, 0.4)
+        # 4. 지역 매칭 보너스
+        location_bonus = 0.0
+        candidate_city = candidate_profile.get('city_name', '')
+        if candidate_city:
+            location_bonus = 0.05  # 같은 지역이면 약간의 보너스
         
-        final_score = min(1.0, base_score + degree_score + (category_weight * 0.3) + random_factor)
-        return round(final_score, 3)
+        # 최종 점수 계산 (프로필 매칭이 가장 큰 비중)
+        final_score = (
+            base_score + 
+            degree_score + 
+            (profile_match_score * 0.6) +  # 60% 가중치
+            (category_weight * 0.2) + 
+            location_bonus
+        )
+        
+        return round(min(1.0, max(0.0, final_score)), 3)
     
     def _fetch_user_profiles_from_core_service(self, user_ids: List[int]) -> List[Dict[str, Any]]:
         """
@@ -144,7 +253,7 @@ class AIRecommendationService:
             logger.error(f"네트워크 그래프 조회 중 오류: {e}")
             return {}
 
-    def find_potential_connections(self, requester_id: int, category: str, 
+    def find_potential_connections(self, requester_id: int, category: str, request_text: str = "",
                                    location: str = None, max_recommendations: int = 5) -> List[Dict[str, Any]]:
         """잠재적 연결 대상(2촌)을 찾고, 필터링 및 점수 계산 후 최종 추천 목록 반환"""
         
@@ -215,7 +324,8 @@ class AIRecommendationService:
                 candidate_profile=profile, 
                 introducer_id=introducer_id,
                 relationship_degree=2, # 2촌 관계이므로 2로 고정
-                category=category
+                category=category,
+                request_text=request_text
             )
             recommendations.append({
                 'recommended_user_id': candidate_id,
@@ -243,9 +353,9 @@ class AIRecommendationService:
             status='pending'
         )
         
-        # 추천 생성 (location 파라미터 추가)
+        # 추천 생성 (request_text와 location 파라미터 추가)
         potential_connections = self.find_potential_connections(
-            user_id, category, location=None, max_recommendations=max_recommendations
+            user_id, category, request_text=request_text, location=None, max_recommendations=max_recommendations
         )
         
         recommendation_logs = []
