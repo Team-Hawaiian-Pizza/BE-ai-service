@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>건너건너 - AI 인맥 추천</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-light: #8b5cf6;
+            --secondary: #f1f5f9;
+            --accent: #06b6d4;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8fafc;
+            color: var(--text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: white;
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #f0fdf4;
+            color: var(--success);
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border: 1px solid #bbf7d0;
+        }
+        
+        .main-content {
+            flex: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            width: 100%;
+        }
+        
+        .hero-section {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .hero-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+        
+        .hero-subtitle {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .grid {
+            display: grid;
+            gap: 2rem;
+        }
+        
+        @media (min-width: 768px) {
+            .grid-2 { grid-template-columns: repeat(2, 1fr); }
+            .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+        }
+        
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        
+        .card-description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            background: white;
+            font-family: inherit;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+        
+        .form-textarea {
+            height: 120px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        .form-help {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            font-family: inherit;
+        }
+        
+        .btn-primary {
+            background: var(--gradient);
+            color: white;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: var(--secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-secondary:hover {
+            background: #e2e8f0;
+        }
+        
+        .btn-full {
+            width: 100%;
+        }
+        
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+        }
+        
+        .example-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .example-btn {
+            padding: 1rem;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+        }
+        
+        .example-btn:hover {
+            background: var(--secondary);
+            border-color: var(--primary);
+        }
+        
+        .example-btn-icon {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .example-btn-text {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .result-container {
+            margin-top: 2rem;
+            display: none;
+        }
+        
+        .result-success {
+            border: 1px solid #bbf7d0;
+            background: #f0fdf4;
+        }
+        
+        .result-error {
+            border: 1px solid #fecaca;
+            background: #fef2f2;
+        }
+        
+        .loading-spinner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .recommendation-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.2s ease;
+        }
+        
+        .recommendation-card:hover {
+            box-shadow: var(--shadow);
+        }
+        
+        .rec-header {
+            display: flex;
+            justify-content: between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+        
+        .rec-score {
+            background: var(--gradient);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+        
+        .rec-info {
+            flex: 1;
+        }
+        
+        .rec-name {
+            font-weight: 600;
+            font-size: 1.125rem;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+        
+        .rec-detail {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .rec-tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .tag {
+            padding: 0.25rem 0.75rem;
+            background: var(--secondary);
+            color: var(--text-secondary);
+            border-radius: 12px;
+            font-size: 0.75rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-secondary);
+        }
+        
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .hero-title {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-network-wired"></i>
+                    </div>
+                    건너건너
+                </div>
+                <div class="header-actions">
+                    <div class="status-badge">
+                        <i class="fas fa-circle" style="font-size: 0.5rem;"></i>
+                        서비스 정상 운영중
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="hero-section">
+                <h1 class="hero-title">AI 인맥 추천 서비스</h1>
+                <p class="hero-subtitle">자연어 분석을 통해 가장 적합한 2촌 인맥을 찾아드립니다</p>
+            </div>
+
+            <div class="grid">
+                <!-- AI 추천 카드 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <h2 class="card-title">AI 인맥 추천</h2>
+                    </div>
+                    <p class="card-description">
+                        원하는 연결을 자연어로 설명하면, AI가 카테고리를 분석하고 최적의 인맥을 추천해드립니다.
+                    </p>
+                    
+                    <div class="example-grid">
+                        <div class="example-btn" onclick="setExample('화장실 변기가 막혔는데 수리해줄 수 있는 분 찾아요')">
+                            <div class="example-btn-icon">🔧</div>
+                            <div class="example-btn-text">수리·유지보수</div>
+                        </div>
+                        <div class="example-btn" onclick="setExample('바퀴벌레가 너무 많이 나와서 방역 전문가가 필요합니다')">
+                            <div class="example-btn-icon">🐜</div>
+                            <div class="example-btn-text">해충·방역</div>
+                        </div>
+                        <div class="example-btn" onclick="setExample('이사 청소 전문적으로 해주실 분 필요해요')">
+                            <div class="example-btn-icon">🧼</div>
+                            <div class="example-btn-text">청소·폐기</div>
+                        </div>
+                        <div class="example-btn" onclick="setExample('포스기 고장났는데 수리해줄 기술자 찾고 있어요')">
+                            <div class="example-btn-icon">⚙️</div>
+                            <div class="example-btn-text">기술 서비스</div>
+                        </div>
+                        <div class="example-btn" onclick="setExample('무거운 냉장고 옮기는 일 도와주실 분 구해요')">
+                            <div class="example-btn-icon">💪</div>
+                            <div class="example-btn-text">생활 도우미</div>
+                        </div>
+                        <div class="example-btn" onclick="setExample('할머니 병원 모시고 갈 분 찾습니다')">
+                            <div class="example-btn-icon">👨‍🦳</div>
+                            <div class="example-btn-text">고령자 지원</div>
+                        </div>
+                    </div>
+
+                    <form id="recommendationForm">
+                        <div class="form-group">
+                            <label class="form-label" for="userId">사용자 ID</label>
+                            <input type="number" id="userId" class="form-input" value="1" required>
+                            <div class="form-help">테스트용: 1-42번 사용자 사용 가능</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="requestText">연결 요청 내용</label>
+                            <textarea id="requestText" class="form-input form-textarea" placeholder="어떤 분과 연결되고 싶으신지 자세히 설명해주세요..." required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="maxRecommendations">추천받을 인원 수</label>
+                            <select id="maxRecommendations" class="form-input">
+                                <option value="3">3명</option>
+                                <option value="5" selected>5명</option>
+                                <option value="10">10명</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-full" id="recommendBtn">
+                            <i class="fas fa-search"></i>
+                            AI 추천 받기
+                        </button>
+                    </form>
+                    
+                    <div id="recommendationResult" class="result-container card"></div>
+                </div>
+
+                <!-- 성능 통계 카드 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h2 class="card-title">실시간 성능 통계</h2>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalRequests">0</div>
+                            <div class="stat-label">총 요청 수</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="avgResponseTime">0.0s</div>
+                            <div class="stat-label">평균 응답 시간</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="successRate">0%</div>
+                            <div class="stat-label">성공률</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="lastCategory">-</div>
+                            <div class="stat-label">최근 분류</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 성능 통계 변수
+        let totalRequests = 0;
+        let successfulRequests = 0;
+        let totalResponseTime = 0;
+        let lastCategory = '-';
+
+        // API 베이스 URL
+        const API_BASE = '/api/ai';
+
+        // 예시 텍스트 설정
+        function setExample(text) {
+            document.getElementById('requestText').value = text;
+            document.getElementById('requestText').focus();
+        }
+
+        // 통계 업데이트
+        function updateStats(responseTime, success, category = null) {
+            totalRequests++;
+            if (success) {
+                successfulRequests++;
+                totalResponseTime += responseTime;
+                if (category) lastCategory = category;
+            }
+
+            document.getElementById('totalRequests').textContent = totalRequests;
+            document.getElementById('avgResponseTime').textContent = 
+                successfulRequests > 0 ? (totalResponseTime / successfulRequests).toFixed(2) + 's' : '0.0s';
+            document.getElementById('successRate').textContent = 
+                Math.round((successfulRequests / totalRequests) * 100) + '%';
+            document.getElementById('lastCategory').textContent = lastCategory;
+        }
+
+        // 로딩 표시
+        function showLoading(containerId) {
+            const container = document.getElementById(containerId);
+            container.style.display = 'block';
+            container.className = 'result-container card';
+            container.innerHTML = `
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>AI가 분석하고 있습니다...</p>
+                </div>
+            `;
+        }
+
+        // 결과 표시
+        function showResult(containerId, success, content) {
+            const container = document.getElementById(containerId);
+            container.className = success ? 'result-container card result-success' : 'result-container card result-error';
+            container.innerHTML = content;
+        }
+
+        // AI 추천 요청
+        document.getElementById('recommendationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('recommendBtn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 분석 중...';
+            
+            showLoading('recommendationResult');
+            
+            const startTime = performance.now();
+            
+            try {
+                const response = await fetch(`${API_BASE}/recommend/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({
+                        user_id: parseInt(document.getElementById('userId').value),
+                        request_text: document.getElementById('requestText').value,
+                        max_recommendations: parseInt(document.getElementById('maxRecommendations').value)
+                    })
+                });
+                
+                const endTime = performance.now();
+                const responseTime = (endTime - startTime) / 1000;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStats(responseTime, true, data.inferred_category);
+                    
+                    let content = `
+                        <div class="card-header">
+                            <div class="card-icon" style="background: var(--success);">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <h3 class="card-title">추천 결과</h3>
+                        </div>
+                        
+                        <div class="rec-detail" style="margin-bottom: 1rem;">
+                            <strong>응답 시간:</strong> ${responseTime.toFixed(2)}초 |
+                            <strong>분류 카테고리:</strong> 
+                            <span class="tag" style="background: var(--primary); color: white;">
+                                ${data.inferred_category}
+                            </span> |
+                            <strong>요청 ID:</strong> ${data.request_id}
+                        </div>
+                    `;
+                    
+                    if (data.recommendations.length > 0) {
+                        content += `<h4 style="margin-bottom: 1rem; color: var(--text-primary);">📍 추천 인맥 (${data.recommendations.length}명)</h4>`;
+                        
+                        data.recommendations.forEach((rec, index) => {
+                            const recUser = rec.recommended_user || {};
+                            const intUser = rec.introducer_user || {};
+                            
+                            content += `
+                                <div class="recommendation-card">
+                                    <div class="rec-header">
+                                        <div class="rec-info">
+                                            <div class="rec-name">
+                                                ${recUser.name || '사용자 ' + (rec.recommended_user_id || rec.recommended_user)}
+                                            </div>
+                                            <div class="rec-detail">
+                                                <i class="fas fa-map-marker-alt"></i> ${recUser.province_name || ''} ${recUser.city_name || ''} | 
+                                                <i class="fas fa-user"></i> ${recUser.age_band || ''} ${recUser.gender === 'male' ? '남성' : recUser.gender === 'female' ? '여성' : ''}
+                                            </div>
+                                            <div class="rec-detail" style="font-style: italic; color: var(--text-secondary);">
+                                                "${recUser.intro || '소개글이 없습니다.'}"
+                                            </div>
+                                        </div>
+                                        <div class="rec-score">${(rec.ai_score * 100).toFixed(0)}점</div>
+                                    </div>
+                                    <div class="rec-tags">
+                                        <span class="tag">
+                                            <i class="fas fa-handshake"></i> 소개자: ${intUser.name || '사용자 ' + (rec.introducer_user_id || rec.introducer_user)}
+                                        </span>
+                                        <span class="tag">
+                                            <i class="fas fa-sitemap"></i> ${rec.relationship_degree}촌 관계
+                                        </span>
+                                        <span class="tag">
+                                            <i class="fas fa-thermometer-half"></i> 매너온도 ${recUser.manner_temperature || 'N/A'}°C
+                                        </span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        content += `
+                            <div class="empty-state">
+                                <div class="empty-icon">📋</div>
+                                <h4>추천할 인맥이 없습니다</h4>
+                                <p>현재 데이터베이스에 관계 정보가 부족합니다.<br>AI 분석 기능은 정상적으로 작동하고 있습니다!</p>
+                            </div>
+                        `;
+                    }
+                    
+                    showResult('recommendationResult', true, content);
+                } else {
+                    const errorData = await response.json();
+                    updateStats(responseTime, false);
+                    showResult('recommendationResult', false, `
+                        <div class="card-header">
+                            <div class="card-icon" style="background: var(--danger);">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <h3 class="card-title">오류 발생</h3>
+                        </div>
+                        <div class="rec-detail">
+                            <strong>상태 코드:</strong> ${response.status}<br>
+                            <strong>오류 메시지:</strong> ${errorData.error || '알 수 없는 오류'}<br>
+                            <strong>응답 시간:</strong> ${responseTime.toFixed(2)}초
+                        </div>
+                    `);
+                }
+            } catch (error) {
+                const endTime = performance.now();
+                const responseTime = (endTime - startTime) / 1000;
+                updateStats(responseTime, false);
+                showResult('recommendationResult', false, `
+                    <div class="card-header">
+                        <div class="card-icon" style="background: var(--danger);">
+                            <i class="fas fa-wifi"></i>
+                        </div>
+                        <h3 class="card-title">네트워크 오류</h3>
+                    </div>
+                    <div class="rec-detail">
+                        <strong>오류:</strong> ${error.message}<br>
+                        서버가 실행 중인지 확인해주세요.
+                    </div>
+                `);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
+
+        // CSRF 토큰 가져오기
+        function getCsrfToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'csrftoken') {
+                    return value;
+                }
+            }
+            return '';
+        }
+    </script>
+</body>
+</html>

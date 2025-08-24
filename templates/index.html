@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>건너건너 - AI 인맥 연결 서비스</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(-45deg, #667eea, #764ba2, #6dd5fa, #2980b9);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 15px 0;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #2c3e50;
+            text-decoration: none;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+        
+        .nav-links a:hover {
+            color: #3498db;
+        }
+        
+        .hero-section {
+            margin-top: 80px;
+            padding: 80px 20px 40px;
+            text-align: center;
+            color: white;
+        }
+        
+        .hero-title {
+            font-size: clamp(2.5em, 5vw, 4em);
+            font-weight: 700;
+            margin-bottom: 20px;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            line-height: 1.2;
+        }
+        
+        .hero-subtitle {
+            font-size: clamp(1.1em, 2vw, 1.4em);
+            font-weight: 300;
+            margin-bottom: 50px;
+            opacity: 0.9;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+        
+        .search-container {
+            max-width: 800px;
+            margin: 0 auto 60px;
+            position: relative;
+            animation: slideUp 0.8s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .search-box {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 25px;
+            padding: 25px 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .search-input {
+            width: 100%;
+            border: none;
+            outline: none;
+            font-size: 1.1em;
+            padding: 20px 25px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            color: #2c3e50;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            resize: none;
+            min-height: 60px;
+            max-height: 150px;
+        }
+        
+        .search-input:focus {
+            background: white;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .search-input::placeholder {
+            color: #7f8c8d;
+            font-weight: 400;
+        }
+        
+        .search-suggestions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .suggestion-chip {
+            background: rgba(52, 152, 219, 0.1);
+            color: #2980b9;
+            padding: 10px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(52, 152, 219, 0.2);
+            text-align: center;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        
+        .suggestion-chip:hover {
+            background: rgba(52, 152, 219, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+        }
+        
+        .search-button {
+            width: 100%;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 18px 30px;
+            border-radius: 15px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .search-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
+        }
+        
+        .search-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .results-section {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 20px 60px;
+            display: none;
+        }
+        
+        .results-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .results-title {
+            color: #2c3e50;
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .results-meta {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .meta-item {
+            background: #ecf0f1;
+            padding: 8px 15px;
+            border-radius: 12px;
+            color: #2c3e50;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        
+        .category-badge {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+        
+        .recommendations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            animation: slideUp 0.8s ease-out 0.2s both;
+        }
+        
+        .recommendation-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(20px);
+        }
+        
+        .recommendation-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3498db, #2980b9);
+        }
+        
+        .recommendation-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        
+        .card-score {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9em;
+        }
+        
+        .card-content h3 {
+            color: #2c3e50;
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding-right: 60px;
+        }
+        
+        .card-detail {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            color: #5a6c7d;
+            font-size: 0.95em;
+        }
+        
+        .card-detail-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            opacity: 0.7;
+        }
+        
+        .connect-button {
+            width: 100%;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .connect-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3);
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #2c3e50;
+        }
+        
+        .no-results-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+        
+        .no-results h3 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .no-results p {
+            font-size: 1.1em;
+            opacity: 0.7;
+            max-width: 500px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        
+        .floating-chat {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.4);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 999;
+        }
+        
+        .floating-chat:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 35px rgba(52, 152, 219, 0.6);
+        }
+        
+        @media (max-width: 768px) {
+            .hero-section {
+                padding: 60px 15px 30px;
+            }
+            
+            .search-box {
+                padding: 20px;
+                margin: 0 15px;
+            }
+            
+            .search-input {
+                font-size: 1em;
+                padding: 15px 20px;
+            }
+            
+            .nav-links {
+                gap: 20px;
+            }
+            
+            .results-section {
+                padding: 0 15px 40px;
+            }
+            
+            .recommendations-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .results-meta {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        .slide-up {
+            animation: slideUp 0.8s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <!-- 네비게이션 바 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#" class="logo">🌐 건너건너</a>
+            <ul class="nav-links">
+                <li><a href="#home">홈</a></li>
+                <li><a href="#about">소개</a></li>
+                <li><a href="#how-it-works">사용법</a></li>
+                <li><a href="#contact">문의</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 히어로 섹션 -->
+    <section class="hero-section">
+        <h1 class="hero-title">일상의 문제를 해결할<br>완벽한 전문가를 찾아드립니다</h1>
+        <p class="hero-subtitle">AI가 분석하는 스마트한 생활 서비스 연결 플랫폼. 2차, 3차 인맥까지 탐색하여 가장 적합한 전문가를 추천해드립니다.</p>
+        
+        <!-- 검색 컨테이너 -->
+        <div class="search-container">
+            <div class="search-box">
+                <textarea 
+                    class="search-input" 
+                    id="searchInput"
+                    placeholder="어떤 생활 서비스가 필요하신가요? 예: '화장실 변기가 막혔는데 수리 전문가를 찾아요', '바퀴벌레 방역 해주실 분이 필요해요'"
+                    rows="2"
+                ></textarea>
+                
+                <div class="search-suggestions">
+                    <div class="suggestion-chip" onclick="setSuggestion('화장실 변기가 막혔는데 수리해줄 수 있는 분 찾아요')">
+                        🔧 수리·유지보수
+                    </div>
+                    <div class="suggestion-chip" onclick="setSuggestion('이사 청소 전문적으로 해주실 분 필요해요')">
+                        🧼 청소·폐기
+                    </div>
+                    <div class="suggestion-chip" onclick="setSuggestion('바퀴벌레가 너무 많이 나와서 방역 전문가가 필요합니다')">
+                        🐜 해충·방역
+                    </div>
+                    <div class="suggestion-chip" onclick="setSuggestion('포스기 고장났는데 수리해줄 기술자 찾고 있어요')">
+                        🧑‍🔧 기술 서비스
+                    </div>
+                    <div class="suggestion-chip" onclick="setSuggestion('무거운 냉장고 옮기는 일 도와주실 분 구해요')">
+                        🧑‍🏭 생활 도우미
+                    </div>
+                    <div class="suggestion-chip" onclick="setSuggestion('할머니 병원 모시고 갈 분 찾습니다')">
+                        👨‍🦳 고령자 지원
+                    </div>
+                </div>
+                
+                <button class="search-button" id="searchButton" onclick="searchConnections()">
+                    <div class="loading-spinner" id="loadingSpinner"></div>
+                    <span id="buttonText">🔍 AI 인맥 찾기</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 검색 결과 섹션 -->
+    <section class="results-section" id="resultsSection">
+        <div class="results-header" id="resultsHeader">
+            <!-- 결과 헤더가 동적으로 삽입됩니다 -->
+        </div>
+        
+        <div class="recommendations-grid" id="recommendationsGrid">
+            <!-- 추천 카드들이 동적으로 삽입됩니다 -->
+        </div>
+    </section>
+
+    <!-- 플로팅 채팅 버튼 -->
+    <div class="floating-chat" onclick="openChat()">
+        💬
+    </div>
+
+    <script>
+        let currentUserId = 1; // 테스트용 사용자 ID (성시경)
+
+        // 검색 제안 설정
+        function setSuggestion(text) {
+            document.getElementById('searchInput').value = text;
+            autoResize(document.getElementById('searchInput'));
+        }
+
+        // 텍스트 에어리어 자동 크기 조절
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+        }
+
+        // 검색 입력 이벤트
+        document.getElementById('searchInput').addEventListener('input', function() {
+            autoResize(this);
+        });
+
+        // 엔터 키 이벤트 (Shift + Enter는 줄바꿈, Enter는 검색)
+        document.getElementById('searchInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                searchConnections();
+            }
+        });
+
+        // AI 인맥 검색 함수
+        async function searchConnections() {
+            const searchInput = document.getElementById('searchInput');
+            const searchButton = document.getElementById('searchButton');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const buttonText = document.getElementById('buttonText');
+            const resultsSection = document.getElementById('resultsSection');
+
+            const query = searchInput.value.trim();
+            
+            if (!query) {
+                alert('연결하고 싶은 사람에 대해 설명해주세요!');
+                return;
+            }
+
+            // 로딩 시작
+            searchButton.disabled = true;
+            loadingSpinner.style.display = 'inline-block';
+            buttonText.textContent = 'AI가 분석 중입니다...';
+            
+            // 기존 결과 숨기기
+            resultsSection.style.display = 'none';
+
+            try {
+                const startTime = performance.now();
+                
+                const response = await fetch('/api/ai/recommend/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({
+                        user_id: currentUserId,
+                        request_text: query,
+                        max_recommendations: 6
+                    })
+                });
+
+                const endTime = performance.now();
+                const responseTime = ((endTime - startTime) / 1000).toFixed(2);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    displayResults(data, responseTime, query);
+                } else {
+                    const errorData = await response.json();
+                    showError(errorData.error || '알 수 없는 오류가 발생했습니다.');
+                }
+            } catch (error) {
+                showError('네트워크 연결을 확인해주세요.');
+            } finally {
+                // 로딩 종료
+                searchButton.disabled = false;
+                loadingSpinner.style.display = 'none';
+                buttonText.textContent = '🔍 AI 인맥 찾기';
+            }
+        }
+
+        // 검색 결과 표시
+        function displayResults(data, responseTime, originalQuery) {
+            const resultsHeader = document.getElementById('resultsHeader');
+            const recommendationsGrid = document.getElementById('recommendationsGrid');
+            const resultsSection = document.getElementById('resultsSection');
+
+            // 카테고리 한글 변환
+            const categoryNames = {
+                'repair': '🔧 수리·유지보수',
+                'cleaning': '🧼 청소·폐기', 
+                'pest_control': '🐜 해충·방역',
+                'tech_service': '🧑‍🔧 기술 서비스',
+                'life_helper': '🧑‍🏭 생활 도우미',
+                'senior_support': '👨‍🦳 고령자·외국인 지원'
+            };
+
+            // 결과 헤더 생성
+            resultsHeader.innerHTML = `
+                <h2 class="results-title">"${originalQuery.length > 50 ? originalQuery.substring(0, 50) + '...' : originalQuery}"</h2>
+                <div class="results-meta">
+                    <div class="category-badge">${categoryNames[data.inferred_category] || data.inferred_category}</div>
+                    <div class="meta-item">⚡ ${responseTime}초</div>
+                    <div class="meta-item">👥 ${data.recommendations.length}명 추천</div>
+                    <div class="meta-item">🆔 요청 #${data.request_id}</div>
+                </div>
+            `;
+
+            // 추천 결과 표시
+            if (data.recommendations.length > 0) {
+                recommendationsGrid.innerHTML = data.recommendations.map((rec, index) => `
+                    <div class="recommendation-card">
+                        <div class="card-score">${Math.round(rec.ai_score * 100)}</div>
+                        <div class="card-content">
+                            <h3>${rec.recommended_user.name || '익명'}</h3>
+                            <div class="card-detail">
+                                <span class="card-detail-icon">👤</span>
+                                ${rec.recommended_user.age_band || '미정'} • ${rec.recommended_user.gender || '미정'}
+                            </div>
+                            <div class="card-detail">
+                                <span class="card-detail-icon">📍</span>
+                                ${rec.recommended_user.city_name || '미정'}
+                            </div>
+                            <div class="card-detail">
+                                <span class="card-detail-icon">💬</span>
+                                ${rec.recommended_user.intro || '소개글이 없습니다.'}
+                            </div>
+                            <div class="card-detail">
+                                <span class="card-detail-icon">🤝</span>
+                                소개자: ${rec.introducer_user.name || '익명'}
+                            </div>
+                            <div class="card-detail">
+                                <span class="card-detail-icon">🔗</span>
+                                ${rec.relationship_degree}차 관계
+                            </div>
+                            <div class="card-detail">
+                                <span class="card-detail-icon">🎯</span>
+                                매칭 점수: ${Math.round(rec.ai_score * 100)}%
+                            </div>
+                            <button class="connect-button" onclick="requestConnection(${rec.id})">
+                                📞 연결 요청하기
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                recommendationsGrid.innerHTML = `
+                    <div class="no-results">
+                        <div class="no-results-icon">🔍</div>
+                        <h3>추천할 인맥을 찾지 못했어요</h3>
+                        <p>현재 데이터베이스에 관련 인맥 정보가 부족합니다. 다른 키워드로 다시 시도해보시거나, 더 구체적으로 설명해주세요!</p>
+                        <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.6;">
+                            💡 AI 분석 기능은 정상 작동하고 있습니다. (카테고리: ${categoryNames[data.inferred_category]})
+                        </p>
+                    </div>
+                `;
+            }
+
+            // 결과 섹션 표시
+            resultsSection.style.display = 'block';
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // 오류 표시
+        function showError(message) {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsHeader = document.getElementById('resultsHeader');
+            const recommendationsGrid = document.getElementById('recommendationsGrid');
+
+            resultsHeader.innerHTML = `
+                <h2 class="results-title">❌ 검색 실패</h2>
+                <div class="results-meta">
+                    <div class="meta-item" style="color: #e74c3c;">${message}</div>
+                </div>
+            `;
+
+            recommendationsGrid.innerHTML = `
+                <div class="no-results">
+                    <div class="no-results-icon">⚠️</div>
+                    <h3>일시적인 오류가 발생했습니다</h3>
+                    <p>잠시 후 다시 시도해주세요. 문제가 계속되면 고객센터로 문의해주시기 바랍니다.</p>
+                </div>
+            `;
+
+            resultsSection.style.display = 'block';
+        }
+
+        // 연결 요청
+        function requestConnection(recommendationId) {
+            alert(`연결 요청이 전송되었습니다! 소개자를 통해 곧 연락드릴 예정입니다. (추천 ID: ${recommendationId})`);
+        }
+
+        // 채팅 열기
+        function openChat() {
+            alert('💬 곧 실시간 채팅 기능이 추가될 예정입니다!');
+        }
+
+        // CSRF 토큰 가져오기
+        function getCsrfToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'csrftoken') {
+                    return value;
+                }
+            }
+            return '';
+        }
+
+        // 네비게이션 스크롤 효과
+        window.addEventListener('scroll', function() {
+            const navbar = document.querySelector('.navbar');
+            if (window.scrollY > 100) {
+                navbar.style.background = 'rgba(255, 255, 255, 0.98)';
+            } else {
+                navbar.style.background = 'rgba(255, 255, 255, 0.95)';
+            }
+        });
+
+        // 페이지 로드 시 입력창에 포커스
+        window.addEventListener('load', function() {
+            document.getElementById('searchInput').focus();
+        });
+    </script>
+</body>
+</html>

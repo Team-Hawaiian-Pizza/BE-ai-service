@@ -1,9 +1,26 @@
-Django==5.2.5
-djangorestframework==3.15.2
-mysqlclient==2.2.6
-redis==5.2.1
-celery==5.4.0
-django-cors-headers==4.6.0
-python-dotenv==1.0.1
-gunicorn==23.0.0
-django-extensions==3.2.3
+# --- Core Framework ---
+Django
+djangorestframework
+gunicorn
+pandas
+scikit-learn
+joblib
+
+# --- Database & Cache ---
+mysqlclient
+redis
+celery
+
+# --- API & Services ---
+google-generativeai
+requests
+boto3
+django-storages
+
+# --- Utilities & Security ---
+python-dotenv
+django-cors-headers
+django-extensions
+whitenoise
+pillow
+django-ratelimit

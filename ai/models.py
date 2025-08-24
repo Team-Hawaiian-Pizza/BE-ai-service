@@ -1,7 +1,5 @@
 from django.db import models
 
-# Create your models here.
-# User 모델은 나중에 연결할 예정이라 주석 처리 
 class Relationships(models.Model):
     # Django는 id(PK)를 자동으로 만들어주므로 생략 가능
     user_from_id = models.BigIntegerField()
