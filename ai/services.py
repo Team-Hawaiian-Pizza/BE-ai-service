@@ -138,7 +138,6 @@ class AIRecommendationService:
         try:
             params = {
                 'depth': depth,
-                'format': 'json',
                 'center': center_user_id
             }
             
