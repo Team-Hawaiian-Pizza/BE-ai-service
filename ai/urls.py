@@ -5,9 +5,9 @@ from . import views
 router = DefaultRouter()
 
 urlpatterns = [
+    path('', views.modern_interface, name='ai_home'),
     path('', include(router.urls)),
     path('recommend/', views.RecommendConnectionView.as_view(), name='recommend_connection'),
     path('feedback/', views.ConnectionFeedbackView.as_view(), name='connection_feedback'),
     path('requests/', views.ConnectionRequestView.as_view(), name='connection_requests'),
-    path('test/', views.test_interface, name='test_interface'),
 ]

@@ -99,10 +99,10 @@ class ConnectionFeedbackView(APIView):
         serializer = ConnectionFeedbackSerializer(feedbacks, many=True)
         return Response(serializer.data)
 
-def test_interface(request):
-    """테스트 인터페이스 페이지"""
-    return render(request, 'test_interface.html')
+def modern_interface(request):
+    """AI 인맥 추천 서비스 메인 페이지"""
+    return render(request, 'modern_interface.html')
 
 def home(request):
     """메인 서비스 페이지"""
-    return render(request, 'index.html')
+    return render(request, 'modern_interface.html')

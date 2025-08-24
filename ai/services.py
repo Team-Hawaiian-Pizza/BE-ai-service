@@ -52,17 +52,8 @@ class AIRecommendationService:
             return 'life_helper' # 유효하지 않은 답변일 경우 기본값 반환
 
         except Exception as e:
-            print(f"Gemini API 호출 중 오류 발생: {e}")
-            return 'life_helper' # API 오류 시 기본값 반환    
-        
-    CATEGORIES = {
-        'repair': ['수리', '전기', '배관', '수도', '가전제품', '샷시', '유리', '문', '열쇠', '잠금장치', '벽', '타일', '싱크대', '고장', '수선'],
-        'cleaning': ['청소', '입주청소', '이사청소', '가게청소', '대청소', '쓰레기', '분리수거', '폐기물', '가구수거', '정리정돈'],
-        'pest_control': ['방역', '바퀴벌레', '쥐', '개미', '모기', '벌', '해충', '소독', '퇴치', '박멸'],
-        'tech_service': ['포스기', '프린터', '와이파이', 'CCTV', '앱', '컴퓨터', '기술지원', '설치', '점검', '수리'],
-        'life_helper': ['짐나르기', '반려동물', '산책', '벌레잡기', '심부름', '물건구매', '배송', '전달', '도움'],
-        'senior_support': ['번역', '통역', '어르신', '집수리', '관공서', '동행', '병원', '약국', '안내', '외국인지원']
-    }
+            logger.error(f"Gemini API 호출 중 오류 발생: {e}")
+            return 'life_helper' # API 오류 시 기본값 반환
     
     def infer_category(self, request_text: str) -> str:
         """요청 텍스트에서 카테고리 추론"""
@@ -120,15 +111,14 @@ class AIRecommendationService:
                 if user.get('id') in user_ids_set
             ]
             
-            print(f"[INFO] Core 서비스에서 {len(filtered_users)}명 사용자 정보 가져옴")
             return filtered_users
 
         except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Core 서비스 호출 실패: {e}")
+            logger.error(f"Core 서비스 호출 실패: {e}")
             return []
             
         except Exception as e:
-            print(f"[ERROR] 예상치 못한 오류: {e}")
+            logger.error(f"사용자 프로필 조회 중 오류: {e}")
             return []
     
     def _fetch_network_graph_from_core_service(self, center_user_id: int, depth: int = 2) -> Dict[str, Any]:
@@ -141,49 +131,31 @@ class AIRecommendationService:
                 'center': center_user_id
             }
             
-            # 호출 URL과 파라미터 로깅
-            logger.info(f"네트워크 그래프 호출 URL: {core_graph_url} with params: {params}")
-            
             response = requests.get(core_graph_url, params=params, timeout=10)
-            
-            # 응답 상태 코드 로깅
-            logger.info(f"네트워크 그래프 API 응답 상태 코드: {response.status_code}")
-            response.raise_for_status() # 오류 상태 코드인 경우 여기서 예외 발생
-
+            response.raise_for_status()
             graph_data = response.json()
-            
-            logger.info(f"Core 서비스에서 네트워크 그래프 데이터 가져옴 - 중심: {graph_data.get('center')}, 노드: {len(graph_data.get('nodes', []))}, 엣지: {len(graph_data.get('edges', []))}")
             return graph_data
             
-        except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP 오류 발생: {e.response.status_code} - {e.response.text}") # HTTP 오류 시 상세 내용 로깅
-            return {}
-            
         except requests.exceptions.RequestException as e:
-            logger.error(f"Core 서비스 네트워크 그래프 호출 실패: {e}")
+            logger.error(f"네트워크 그래프 조회 실패: {e}")
             return {}
             
         except Exception as e:
-            logger.error(f"네트워크 그래프 조회 중 예상치 못한 오류: {e}")
+            logger.error(f"네트워크 그래프 조회 중 오류: {e}")
             return {}
 
     def find_potential_connections(self, requester_id: int, category: str, 
                                    location: str = None, max_recommendations: int = 5) -> List[Dict[str, Any]]:
         """잠재적 연결 대상(2촌)을 찾고, 필터링 및 점수 계산 후 최종 추천 목록 반환"""
         
-        print(f"[DEBUG] 추천 시작 - 요청자: {requester_id}, 카테고리: {category}")
-        
         # 1. Core 서비스에서 네트워크 그래프 데이터 가져오기
         graph_data = self._fetch_network_graph_from_core_service(requester_id, depth=2)
         
         if not graph_data or 'edges' not in graph_data:
-            print(f"[DEBUG] 네트워크 그래프 데이터를 가져올 수 없어서 추천 종료")
             return []
         
         edges = graph_data['edges']
         center_user = graph_data.get('center', requester_id)
-        
-        print(f"[DEBUG] 네트워크 그래프 - 중심: {center_user}, 엣지 수: {len(edges)}")
         
         # 2. 1차 관계 (직접 연결된 친구들) 찾기
         first_degree_friends = set()
@@ -196,10 +168,7 @@ class AIRecommendationService:
             elif target == requester_id:
                 first_degree_friends.add(source)
         
-        print(f"[DEBUG] 1촌 친구들: {first_degree_friends}")
-        
         if not first_degree_friends:
-            print(f"[DEBUG] 1촌 친구가 없어서 추천 종료")
             return []
 
         # 3. 2차 관계 (친구의 친구들) 후보 찾기
@@ -221,15 +190,12 @@ class AIRecommendationService:
                     candidates[candidate_id] = introducer_id
         
         all_candidate_ids = list(candidates.keys())
-        print(f"[DEBUG] 2촌 후보들: {candidates}")
         
         if not all_candidate_ids:
-            print(f"[DEBUG] 2촌 후보가 없어서 추천 종료")
             return [] # 2촌 후보가 없으면 종료
 
         # 3. Core 서비스에서 후보들의 프로필 정보를 일괄 조회
         candidate_profiles = self._fetch_user_profiles_from_core_service(all_candidate_ids)
-        print(f"[DEBUG] Core 서비스에서 가져온 프로필 수: {len(candidate_profiles)}")
 
         # 4. (선택사항) 동네 기반으로 후보 필터링
         if location:
@@ -260,9 +226,7 @@ class AIRecommendationService:
             
         # 6. AI 점수 기준으로 정렬하고 상위 N개 반환
         recommendations.sort(key=lambda x: x['ai_score'], reverse=True)
-        final_recommendations = recommendations[:max_recommendations]
-        print(f"[DEBUG] 최종 추천 결과: {len(final_recommendations)}개")
-        return final_recommendations
+        return recommendations[:max_recommendations]
     
     def create_recommendation_request(self, user_id: int, request_text: str, 
                                    max_recommendations: int = 5) -> Dict[str, Any]:
