@@ -5,6 +5,8 @@ from typing import List, Dict, Any
 from django.db.models import Q
 from .models import Relationships, ConnectionRequest, RecommendationLog
 import google.generativeai as genai 
+import logging
+logger = logging.getLogger(__name__)
 
 class AIRecommendationService:
     """AI 기반 연결 추천 서비스 (Gemini 1.5 Pro API 연동)"""
@@ -140,19 +142,30 @@ class AIRecommendationService:
                 'center': center_user_id
             }
             
+            # 호출 URL과 파라미터 로깅
+            logger.info(f"네트워크 그래프 호출 URL: {core_graph_url} with params: {params}")
+            
             response = requests.get(core_graph_url, params=params, timeout=10)
-            response.raise_for_status()
+            
+            # 응답 상태 코드 로깅
+            logger.info(f"네트워크 그래프 API 응답 상태 코드: {response.status_code}")
+            response.raise_for_status() # 오류 상태 코드인 경우 여기서 예외 발생
+
             graph_data = response.json()
             
-            print(f"[INFO] Core 서비스에서 네트워크 그래프 데이터 가져옴 - 중심: {graph_data.get('center')}, 노드: {len(graph_data.get('nodes', []))}, 엣지: {len(graph_data.get('edges', []))}")
+            logger.info(f"Core 서비스에서 네트워크 그래프 데이터 가져옴 - 중심: {graph_data.get('center')}, 노드: {len(graph_data.get('nodes', []))}, 엣지: {len(graph_data.get('edges', []))}")
             return graph_data
             
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"HTTP 오류 발생: {e.response.status_code} - {e.response.text}") # HTTP 오류 시 상세 내용 로깅
+            return {}
+            
         except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Core 서비스 네트워크 그래프 호출 실패: {e}")
+            logger.error(f"Core 서비스 네트워크 그래프 호출 실패: {e}")
             return {}
             
         except Exception as e:
-            print(f"[ERROR] 네트워크 그래프 조회 중 예상치 못한 오류: {e}")
+            logger.error(f"네트워크 그래프 조회 중 예상치 못한 오류: {e}")
             return {}
 
     def find_potential_connections(self, requester_id: int, category: str, 
