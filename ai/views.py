@@ -17,6 +17,9 @@ class RecommendConnectionView(APIView):
     """AI 기반 연결 추천 API"""
     
     def post(self, request):
+        # DEBUG용
+        print(f"[DEBUG] API 요청이 RecommendConnectionView에 들어왔습니다. 요청 데이터: {request.data}")
+        
         serializer = RecommendationRequestSerializer(data=request.data)
         if serializer.is_valid():
             ai_service = AIRecommendationService()
